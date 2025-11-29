@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, Partials } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, Partials, AttachmentBuilder } = require('discord.js');
 const express = require('express');
 const { Pool } = require('pg');
 
@@ -135,14 +135,12 @@ function parseInterval(intervalStr) {
 async function sendMinkyToChannel(channel) {
   try {
     const response = await fetch(`https://minky.materii.dev?cb=${Date.now()}`);
-    const imageUrl = response.url;
+    const imageBuffer = Buffer.from(await response.arrayBuffer());
+    const attachment = new AttachmentBuilder(imageBuffer, { name: 'minky.jpg' });
     
     await channel.send({
-      embeds: [{
-        title: "Here's a random Minky 🐱",
-        image: { url: imageUrl },
-        color: 0xFFC0CB
-      }]
+      content: "Here's a random Minky 🐱",
+      files: [attachment]
     });
   } catch (err) {
     console.error('Failed to send scheduled Minky:', err);
@@ -290,14 +288,12 @@ client.on('interactionCreate', async (interaction) => {
   if (interaction.commandName === 'minky') {
     try {
       const response = await fetch(`https://minky.materii.dev?cb=${Date.now()}`);
-      const imageUrl = response.url;
+      const imageBuffer = Buffer.from(await response.arrayBuffer());
+      const attachment = new AttachmentBuilder(imageBuffer, { name: 'minky.jpg' });
 
       await interaction.reply({
-        embeds: [{
-          title: "Here's a random Minky 🐱",
-          image: { url: imageUrl },
-          color: 0xFFC0CB
-        }]
+        content: "Here's a random Minky 🐱",
+        files: [attachment]
       });
     } catch (err) {
       console.error(err);
