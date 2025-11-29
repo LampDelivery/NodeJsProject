@@ -1,8 +1,0 @@
-services:
-  - type: web
-    name: discord-bot
-    runtime: node
-    startCommand: node src/index.js
-    envVars:
-      - key: NODE_ENV
-        value: production
