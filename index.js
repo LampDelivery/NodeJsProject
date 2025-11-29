@@ -73,8 +73,8 @@ client.on('interactionCreate', async (interaction) => {
         embeds: [{
           title: '📱 Android Installation',
           description: '**Choose your method:**\n\n' +
-            '🔓 **Root with Xposed** → KettuXposed\n\n' +
-            '📦 **Non-root** → KettuManager\n\n' +
+            '🔓 **Root with Xposed** → [KettuXposed](https://github.com/C0C0B01/KettuXposed/releases/latest)\n\n' +
+            '📦 **Non-root** → [KettuManager](https://github.com/C0C0B01/KettuManager/releases/latest)\n\n' +
             '*If you don\'t know what root is, go with KettuManager*',
           color: 0x3DDC84
         }],
@@ -88,8 +88,8 @@ client.on('interactionCreate', async (interaction) => {
         embeds: [{
           title: '🍎 iOS Installation',
           description: '**Choose your method:**\n\n' +
-            '🔓 **Jailbroken** → KettuTweak\n\n' +
-            '📦 **Jailed** → BTLoader\n\n' +
+            '🔓 **Jailbroken** → [KettuTweak](https://github.com/C0C0B01/KettuTweak)\n\n' +
+            '📦 **Jailed** → [BTLoader](https://github.com/CloudySn0w/BTLoader)\n\n' +
             '*If you don\'t know what jailbreak is, go with BTLoader*',
           color: 0x007AFF
         }],
