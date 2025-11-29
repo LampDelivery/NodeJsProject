@@ -16,7 +16,7 @@ const client = new Client({
   ]
 });
 
-const responders = [];
+const responders = {};
 
 client.once('clientReady', async () => {
   console.log(`Logged in as ${client.user.tag}`);
@@ -91,11 +91,14 @@ client.on('interactionCreate', async (interaction) => {
       });
     }
 
+    const guildId = interaction.guildId;
+    if (!responders[guildId]) responders[guildId] = [];
+
     const trigger = interaction.options.getString('trigger').toLowerCase();
     const response = interaction.options.getString('response');
     const channel = interaction.options.getChannel('channel');
 
-    responders.push({
+    responders[guildId].push({
       trigger,
       response,
       channelId: channel?.id || null
@@ -110,9 +113,11 @@ client.on('error', (error) => {
 });
 
 client.on('messageCreate', (message) => {
-  if (message.author.bot) return;
+  if (message.author.bot || !message.guild) return;
 
-  for (const r of responders) {
+  const guildResponders = responders[message.guild.id] || [];
+
+  for (const r of guildResponders) {
     const matches = message.content.toLowerCase().includes(r.trigger);
     const channelMatch = !r.channelId || message.channel.id === r.channelId;
 
