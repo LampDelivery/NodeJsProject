@@ -12,11 +12,29 @@ Preferred communication style: Simple, everyday language.
 
 ```
 ├── src/
-│   └── index.js          # Main bot code
-├── assets/               # Screenshots and assets (cleared for cleanup)
-├── package.json          # Dependencies and scripts
-├── replit.md             # Project documentation and changelog (consolidated)
-└── README.md             # Project documentation
+│   ├── index.js              # Main entry point - initializes client, loads handlers
+│   ├── commands/             # Slash command files (one per command)
+│   │   ├── minky.js          # Random Minky image command
+│   │   ├── minkyinterval.js  # Schedule automatic Minky images
+│   │   ├── stopminky.js      # Stop scheduled Minky images
+│   │   ├── addresponder.js   # Add autoresponder (Admin)
+│   │   ├── deleteresponder.js # Delete autoresponder (Admin)
+│   │   ├── install.js        # Installation instructions
+│   │   └── setstatus.js      # Set bot status (Owner)
+│   ├── events/               # Event handler files
+│   │   ├── ready.js          # Bot ready/startup logic
+│   │   ├── interactionCreate.js # Command & button interactions
+│   │   ├── messageCreate.js  # Message autoresponders & DM handling
+│   │   └── error.js          # Error handling
+│   ├── handlers/             # Module loaders
+│   │   ├── commandLoader.js  # Loads all commands from commands/
+│   │   └── eventLoader.js    # Loads all events from events/
+│   └── utils/                # Utility modules
+│       ├── database.js       # PostgreSQL operations & data caching
+│       └── helpers.js        # Interval parsing, Minky image fetching
+├── package.json              # Dependencies and scripts
+├── replit.md                 # Project documentation and changelog
+└── README.md                 # Project documentation
 ```
 
 ## System Architecture
@@ -116,6 +134,7 @@ Preferred communication style: Simple, everyday language.
 ## Changelog
 
 ### Recent Changes
+- November 29, 2025: Refactored bot into modular architecture (commands/, events/, utils/, handlers/ folders)
 - November 29, 2025: Deleted render.yaml (redundant with Render dashboard config)
 - November 29, 2025: Cleared assets folder for cleanup
 - November 29, 2025: Added /setstatus command (owner-only) for setting bot status and message
