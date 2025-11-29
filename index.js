@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const express = require('express');
 
 const TOKEN = process.env.DISCORD_BOT_TOKEN;
@@ -46,7 +46,10 @@ client.once('clientReady', async () => {
       .addChannelOption(option =>
         option.setName('channel')
           .setDescription('Optional channel restriction')
-          .setRequired(false))
+          .setRequired(false)),
+    new SlashCommandBuilder()
+      .setName('install')
+      .setDescription('Get Kettu installation instructions')
   ];
 
   const rest = new REST({ version: '10' }).setToken(TOKEN);
@@ -64,7 +67,66 @@ client.once('clientReady', async () => {
 });
 
 client.on('interactionCreate', async (interaction) => {
+  if (interaction.isButton()) {
+    if (interaction.customId === 'install_android') {
+      await interaction.reply({
+        embeds: [{
+          title: '📱 Android Installation',
+          description: '**Choose your method:**\n\n' +
+            '🔓 **Root with Xposed** → KettuXposed\n\n' +
+            '📦 **Non-root** → KettuManager\n\n' +
+            '*If you don\'t know what root is, go with KettuManager*',
+          color: 0x3DDC84
+        }],
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (interaction.customId === 'install_ios') {
+      await interaction.reply({
+        embeds: [{
+          title: '🍎 iOS Installation',
+          description: '**Choose your method:**\n\n' +
+            '🔓 **Jailbroken** → KettuTweak\n\n' +
+            '📦 **Jailed** → BTLoader\n\n' +
+            '*If you don\'t know what jailbreak is, go with BTLoader*',
+          color: 0x007AFF
+        }],
+        ephemeral: true
+      });
+      return;
+    }
+  }
+
   if (!interaction.isChatInputCommand()) return;
+
+  if (interaction.commandName === 'install') {
+    const row = new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId('install_android')
+          .setLabel('Android')
+          .setStyle(ButtonStyle.Success)
+          .setEmoji('📱'),
+        new ButtonBuilder()
+          .setCustomId('install_ios')
+          .setLabel('iOS')
+          .setStyle(ButtonStyle.Primary)
+          .setEmoji('🍎')
+      );
+
+    await interaction.reply({
+      embeds: [{
+        title: '📲 Kettu Installation',
+        description: 'Select your platform to get installation instructions:',
+        color: 0x5865F2
+      }],
+      components: [row],
+      ephemeral: true
+    });
+    return;
+  }
 
   if (interaction.commandName === 'minky') {
     try {
