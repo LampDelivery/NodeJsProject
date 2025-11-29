@@ -68,7 +68,7 @@ client.on('interactionCreate', async (interaction) => {
 
   if (interaction.commandName === 'minky') {
     try {
-      const imageUrl = 'https://minky.materii.dev';
+      const imageUrl = `https://minky.materii.dev?cb=${Date.now()}`;
 
       await interaction.reply({
         embeds: [{
