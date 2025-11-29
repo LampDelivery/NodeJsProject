@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a Discord bot built with Node.js and discord.js v14. The bot provides slash commands for image sharing, installation instructions, and a server-specific autoresponder system. It uses an Express server (likely for health checks or webhook endpoints) and stores autoresponder configurations in memory.
+This is a Discord bot built with Node.js and discord.js v14. The bot provides slash commands for image sharing, installation instructions, and a server-specific autoresponder system. It uses an Express server for health checks, PostgreSQL for persistent storage of autoresponders and scheduled Minky intervals.
 
 ## User Preferences
 
@@ -26,15 +26,23 @@ Preferred communication style: Simple, everyday language.
   - `/deleteresponder` - Admin-only command for removing autoresponders
 - **Permission Model**: Administrator permission checks enforced for autoresponder and Minky interval management
 
+### Data Persistence
+- **Database**: PostgreSQL with pg library
+- **Tables**:
+  - `autoresponders`: Stores guild_id, trigger_phrase, response, channel_id
+  - `minky_intervals`: Stores guild_id, channel_id, interval_str, interval_ms
+- **Loading**: Data is loaded from database on bot startup
+- **Saving**: Data is saved to database when adding/modifying/deleting entries
+- **Persistence**: All autoresponders and scheduled Minky intervals survive bot restarts
+
 ### Autoresponder Architecture
-- **Storage**: In-memory storage using a JavaScript object keyed by guild ID
+- **Storage**: PostgreSQL database with in-memory cache for fast access
 - **Scope**: Server-specific (each Discord server maintains its own autoresponders)
 - **Features**:
   - Case-insensitive trigger matching
   - Optional channel-specific restrictions
   - Trigger phrase and response message pairs
-- **Rationale**: In-memory storage chosen for simplicity; data is ephemeral and resets on bot restart
-- **Trade-offs**: No persistence across restarts, but eliminates need for database infrastructure for simple use cases
+  - Persistent storage across restarts
 
 ### Interactive Components
 - **Buttons**: Action rows with button builders for platform selection in `/install` command
@@ -56,6 +64,7 @@ Preferred communication style: Simple, everyday language.
 ### Core Libraries
 - **discord.js v14.25.1**: Discord API wrapper providing client, REST, gateway, and command builders
 - **express v5.1.0**: Web framework (likely for health endpoints or future webhook integration)
+- **pg**: PostgreSQL client for Node.js, used for database persistence
 
 ### Discord API
 - **Gateway Connection**: WebSocket connection for real-time event handling
