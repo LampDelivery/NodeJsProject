@@ -7,6 +7,45 @@ const pool = new Pool({
 const responders = {};
 const minkyIntervals = {};
 
+async function initializeDatabase() {
+  try {
+    // Create autoresponders table if it doesn't exist
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS autoresponders (
+        guild_id VARCHAR(255) NOT NULL,
+        trigger_phrase VARCHAR(255) NOT NULL,
+        response TEXT NOT NULL,
+        channel_id VARCHAR(255),
+        PRIMARY KEY (guild_id, trigger_phrase, channel_id)
+      )
+    `);
+
+    // Create minky_intervals table if it doesn't exist
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS minky_intervals (
+        guild_id VARCHAR(255) NOT NULL,
+        channel_id VARCHAR(255) NOT NULL,
+        interval_str VARCHAR(50) NOT NULL,
+        interval_ms INTEGER NOT NULL,
+        PRIMARY KEY (guild_id, channel_id)
+      )
+    `);
+
+    // Create bot_status table if it doesn't exist
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS bot_status (
+        status VARCHAR(50) NOT NULL,
+        activity VARCHAR(50) NOT NULL,
+        message TEXT NOT NULL
+      )
+    `);
+
+    console.log('Database tables initialized successfully');
+  } catch (err) {
+    console.error('Error initializing database:', err);
+  }
+}
+
 async function loadAutoresponders() {
   try {
     const result = await pool.query('SELECT * FROM autoresponders');
@@ -111,6 +150,7 @@ module.exports = {
   pool,
   responders,
   minkyIntervals,
+  initializeDatabase,
   loadAutoresponders,
   saveAutoresponder,
   deleteAutoresponderFromDb,
