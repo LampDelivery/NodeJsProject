@@ -7,6 +7,30 @@ let cachedPlugins = [];
 let cacheTimestamp = 0;
 const CACHE_DURATION = 12 * 60 * 60 * 1000; // 12 hours
 
+function normalizePluginUrl(url) {
+  try {
+    // jsDelivr GitHub: https://cdn.jsdelivr.net/gh/user/repo@version/path/file.zip
+    const jsDelivrMatch = url.match(/cdn\.jsdelivr\.net\/gh\/([^@/]+)\/([^@]+)@([^/]+)\/(.*)/);
+    if (jsDelivrMatch) {
+      const [, user, repo, version, path] = jsDelivrMatch;
+      return `https://raw.githubusercontent.com/${user}/${repo}/${version}/${path}`;
+    }
+
+    // GitLab: https://gitlab.com/user/repo/-/raw/branch/path/file.zip
+    const gitlabMatch = url.match(/gitlab\.com\/([^/]+)\/([^/]+)\/-\/raw\/([^/]+)\/(.*)/);
+    if (gitlabMatch) {
+      const [, user, repo, branch, path] = gitlabMatch;
+      return `https://gitlab.com/${user}/${repo}/-/raw/${branch}/${path}`;
+    }
+
+    // If already raw.githubusercontent.com or other, return as-is
+    return url;
+  } catch (err) {
+    console.error('Error normalizing URL:', url, err);
+    return url;
+  }
+}
+
 async function fetchPlugins() {
   const now = Date.now();
   if (cachedPlugins.length > 0 && (now - cacheTimestamp) < CACHE_DURATION) {
@@ -27,10 +51,11 @@ async function fetchPlugins() {
       for (const plugin of data) {
         if (plugin.name && plugin.url) {
           const authors = Array.isArray(plugin.authors) ? plugin.authors.join(', ') : 'Unknown';
+          const normalizedUrl = normalizePluginUrl(plugin.url);
           plugins.push({
             name: plugin.name,
             description: plugin.description || 'No description',
-            url: plugin.url,
+            url: normalizedUrl,
             version: plugin.version || '',
             authors: authors,
             changelog: plugin.changelog || ''
