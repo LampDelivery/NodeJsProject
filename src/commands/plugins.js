@@ -1,83 +1,56 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 
 const ALIUCORD_GUILD_ID = '811255666990907402';
-const PLUGIN_LIST_CHANNEL_ID = '811275162715553823';
+const MANIFEST_URL = 'https://plugins.aliucord.com/manifest.json';
 const PLUGINS_PER_PAGE = 5;
 
 let cachedPlugins = [];
 let cacheTimestamp = 0;
-const CACHE_DURATION = 5 * 60 * 1000;
+const CACHE_DURATION = 12 * 60 * 60 * 1000; // 12 hours
 
-function parsePluginMessage(message) {
-  const content = message.content;
-  if (!content) return null;
-
-  // First priority: extract .zip file URL - this is critical
-  const zipMatch = content.match(/<?(https?:\/\/[^\s>]+\.zip)>?/i);
-  if (!zipMatch) return null;
-  
-  const downloadLink = zipMatch[1];
-
-  // Look for plugin name in **bold** format
-  const nameMatch = content.match(/\*\*([^*]+)\*\*/);
-  if (!nameMatch) return null;
-  
-  const name = nameMatch[1].trim();
-  if (!name) return null;
-
-  const lines = content.split('\n').map(l => l.trim()).filter(l => l);
-  let description = '';
-  let info = '';
-  const author = message.author?.username || 'Unknown';
-
-  // Collect description and info lines
-  for (const line of lines) {
-    if (line.startsWith('**') || line.startsWith('<')) continue; // Skip name and links
-    if (line.toLowerCase().startsWith('info:')) {
-      info = line.substring(4).trim();
-    } else if (!line.startsWith('http')) {
-      if (description) description += ' ';
-      description += line;
-    }
-  }
-
-  return {
-    name,
-    description: description || 'No description',
-    downloadLink,
-    info,
-    author,
-    messageId: message.id
-  };
-}
-
-async function fetchPlugins(client) {
+async function fetchPlugins() {
   const now = Date.now();
   if (cachedPlugins.length > 0 && (now - cacheTimestamp) < CACHE_DURATION) {
     return cachedPlugins;
   }
 
   try {
-    const channel = await client.channels.fetch(PLUGIN_LIST_CHANNEL_ID);
-    if (!channel) return [];
+    const response = await fetch(MANIFEST_URL);
+    if (!response.ok) {
+      console.error(`Error fetching manifest: HTTP ${response.status}`);
+      return cachedPlugins.length > 0 ? cachedPlugins : [];
+    }
 
-    const messages = await channel.messages.fetch({ limit: 100 });
+    const data = await response.json();
     const plugins = [];
 
-    messages.forEach(message => {
-      const plugin = parsePluginMessage(message);
-      if (plugin) {
-        plugins.push(plugin);
+    if (Array.isArray(data)) {
+      for (const plugin of data) {
+        if (plugin.name && plugin.sourceUrl) {
+          plugins.push({
+            name: plugin.name,
+            description: plugin.description || 'No description',
+            downloadLink: plugin.sourceUrl,
+            info: plugin.author ? `by ${plugin.author}` : '',
+            author: plugin.author || 'Unknown'
+          });
+        }
       }
-    });
+    }
 
     cachedPlugins = plugins;
     cacheTimestamp = now;
+    console.log(`Fetched ${plugins.length} plugins from Aliucord manifest`);
     return plugins;
   } catch (err) {
-    console.error('Error fetching plugins:', err);
+    console.error('Error fetching plugins from manifest:', err);
     return cachedPlugins.length > 0 ? cachedPlugins : [];
   }
+}
+
+async function initializePluginCache() {
+  console.log('Initializing plugin cache...');
+  await fetchPlugins();
 }
 
 function filterPlugins(plugins, search) {
@@ -113,7 +86,7 @@ module.exports = {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const search = interaction.options.getString('search');
-    const allPlugins = await fetchPlugins(interaction.client);
+    const allPlugins = await fetchPlugins();
     const plugins = search ? filterPlugins(allPlugins, search) : allPlugins.slice(0, 5);
 
     if (plugins.length === 0) {
@@ -135,7 +108,7 @@ module.exports = {
 
   async executePrefix(message, args) {
     const search = args.join(' ') || null;
-    const allPlugins = await fetchPlugins(message.client);
+    const allPlugins = await fetchPlugins();
     const plugins = search ? filterPlugins(allPlugins, search) : allPlugins.slice(0, 5);
 
     if (plugins.length === 0) {
@@ -157,5 +130,6 @@ module.exports = {
 
   fetchPlugins,
   filterPlugins,
+  initializePluginCache,
   ALIUCORD_GUILD_ID
 };
