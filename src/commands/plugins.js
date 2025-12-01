@@ -12,38 +12,34 @@ function parsePluginMessage(message) {
   const content = message.content;
   if (!content) return null;
 
-  const lines = content.split('\n').filter(line => line.trim());
-  if (lines.length < 2) return null;
-
-  const nameMatch = lines[0].match(/\*\*(.+?)\*\*/);
-  if (!nameMatch) return null;
-
-  const name = nameMatch[1];
+  // First priority: extract .zip file URL - this is critical
+  const zipMatch = content.match(/<?(https?:\/\/[^\s>]+\.zip)>?/i);
+  if (!zipMatch) return null;
   
+  const downloadLink = zipMatch[1];
+
+  // Look for plugin name in **bold** format
+  const nameMatch = content.match(/\*\*([^*]+)\*\*/);
+  if (!nameMatch) return null;
+  
+  const name = nameMatch[1].trim();
+  if (!name) return null;
+
+  const lines = content.split('\n').map(l => l.trim()).filter(l => l);
   let description = '';
-  let downloadLink = '';
   let info = '';
-  let author = message.author?.username || 'Unknown';
+  const author = message.author?.username || 'Unknown';
 
-  // First priority: look for .zip file URLs
-  const zipMatch = content.match(/<?(https?:\/\/[^\s>]+\.zip)>?/);
-  if (zipMatch) {
-    downloadLink = zipMatch[1];
-  }
-
-  // Parse description and info from lines
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    
+  // Collect description and info lines
+  for (const line of lines) {
+    if (line.startsWith('**') || line.startsWith('<')) continue; // Skip name and links
     if (line.toLowerCase().startsWith('info:')) {
-      info = line.substring(5).trim();
-    } else if (!line.startsWith('http') && !line.startsWith('<')) {
+      info = line.substring(4).trim();
+    } else if (!line.startsWith('http')) {
       if (description) description += ' ';
       description += line;
     }
   }
-
-  if (!downloadLink) return null;
 
   return {
     name,
