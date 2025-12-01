@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 
 const ALIUCORD_GUILD_ID = '811255666990907402';
 const PLUGIN_LIST_CHANNEL_ID = '811275162715553823';
@@ -114,7 +114,7 @@ module.exports = {
         .setRequired(false)),
 
   async execute(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const search = interaction.options.getString('search');
     const allPlugins = await fetchPlugins(interaction.client);

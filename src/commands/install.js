@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -17,7 +17,7 @@ module.exports = {
             '*Use the manager to install and manage Aliucord*',
           color: 0x3DDC84
         }],
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     } else {
       const row = new ActionRowBuilder()
