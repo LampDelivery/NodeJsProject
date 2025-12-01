@@ -9,6 +9,13 @@ const CACHE_DURATION = 12 * 60 * 60 * 1000; // 12 hours
 
 function normalizePluginUrl(url) {
   try {
+    // raw.githubusercontent.com /refs/heads/ → github.com /raw/ conversion
+    const rawGithubRefsMatch = url.match(/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/refs\/heads\/(.+)/);
+    if (rawGithubRefsMatch) {
+      const [, user, repo, pathWithBranch] = rawGithubRefsMatch;
+      return `https://github.com/${user}/${repo}/raw/${pathWithBranch}`;
+    }
+
     // GitHub /refs/heads/ → /raw/ conversion
     const githubRefsMatch = url.match(/github\.com\/([^/]+)\/([^/]+)\/refs\/heads\/(.+)/);
     if (githubRefsMatch) {
@@ -30,7 +37,7 @@ function normalizePluginUrl(url) {
       return `https://gitlab.com/${user}/${repo}/-/raw/${branch}/${path}`;
     }
 
-    // If already raw.githubusercontent.com or other, return as-is
+    // If already in correct format or other, return as-is
     return url;
   } catch (err) {
     console.error('Error normalizing URL:', url, err);
