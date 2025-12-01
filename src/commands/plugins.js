@@ -97,6 +97,12 @@ function filterPlugins(plugins, search) {
   );
 }
 
+function truncate(text, maxLength = 200) {
+  if (!text) return '';
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength).trim() + '...';
+}
+
 function createPluginEmbed(plugins, page, totalPages, search) {
   const start = page * PLUGINS_PER_PAGE;
   const pagePlugins = plugins.slice(start, start + PLUGINS_PER_PAGE);
@@ -104,16 +110,16 @@ function createPluginEmbed(plugins, page, totalPages, search) {
   let description = '';
   
   pagePlugins.forEach((plugin, index) => {
-    description += `**${start + index + 1}. ${plugin.name}**\n`;
-    description += `${plugin.description}\n`;
+    description += `**${start + index + 1}. ${truncate(plugin.name, 100)}**\n`;
+    description += `${truncate(plugin.description, 200)}\n`;
     if (plugin.info) {
-      description += `*${plugin.info}*\n`;
+      description += `*${truncate(plugin.info, 150)}*\n`;
     }
     description += `${plugin.downloadLink}\n\n`;
   });
 
   return {
-    title: search ? `Plugin Search: "${search}"` : 'Aliucord Plugins',
+    title: search ? `Plugin Search: "${truncate(search, 50)}"` : 'Aliucord Plugins',
     description: description || 'No plugins found.',
     footer: { text: `Page ${page + 1} of ${totalPages} | ${plugins.length} plugin${plugins.length !== 1 ? 's' : ''} found` },
     color: 0x3DDC84
