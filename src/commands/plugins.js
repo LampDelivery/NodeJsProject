@@ -174,19 +174,14 @@ module.exports = {
   },
 
   async executePrefix(message, args) {
-    const rawArgs = args.join(' ');
-    const sendMatch = rawArgs.match(/send:(true|false)/i);
-    const send = sendMatch ? sendMatch[1].toLowerCase() === 'true' : true;
-    const search = rawArgs.replace(/\s+send:(true|false)/i, '').trim() || null;
+    const search = args.join(' ').trim() || null;
 
     const allPlugins = await fetchPlugins();
     const filteredPlugins = search ? filterPlugins(allPlugins, search) : allPlugins;
 
     if (filteredPlugins.length === 0) {
       const reply = await message.reply('No plugins found.');
-      if (!send) {
-        setTimeout(() => reply.delete().catch(() => {}), 30000);
-      }
+      setTimeout(() => reply.delete().catch(() => {}), 30000);
       return;
     }
 
@@ -211,9 +206,7 @@ module.exports = {
     const replyOptions = { content, components: [row] };
     
     const reply = await message.reply(replyOptions);
-    if (!send) {
-      setTimeout(() => reply.delete().catch(() => {}), 30000);
-    }
+    setTimeout(() => reply.delete().catch(() => {}), 30000);
   },
 
   handleButton,
