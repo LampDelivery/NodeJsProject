@@ -49,10 +49,15 @@ async function handleButton(interaction) {
         await pluginsCommand.handleButton(interaction, action, page, hasSearch);
       } catch (error) {
         console.error('Error handling plugins button:', error);
-        await interaction.reply({
-          content: '❌ Error loading plugins. Please try again.',
-          flags: MessageFlags.Ephemeral
-        });
+        try {
+          await interaction.update({
+            content: '❌ Error loading plugins. Please try again.',
+            components: []
+          });
+        } catch (updateError) {
+          // Interaction already acknowledged
+          console.error('Could not update button interaction:', updateError);
+        }
       }
     }
     return;
