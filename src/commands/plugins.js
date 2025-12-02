@@ -158,10 +158,11 @@ async function handleButton(interaction, action, page, hasSearch) {
     const pagePlugins = filteredPlugins.slice(start, start + PLUGINS_PER_PAGE);
 
     let content = '';
+    const isSupported = isChannelSupported(interaction.channelId);
     if (search) {
-      content += `**Search results for: "${search}"** (${filteredPlugins.length} found)\n\n`;
+      content += `**Search results for: "${search}"** (${filteredPlugins.length} found)${!isSupported ? ' — Preview' : ''}\n\n`;
     } else {
-      content += `**All Plugins** (Page ${page + 1}/${totalPages})\n\n`;
+      content += `**All Plugins** (Page ${page + 1}/${totalPages})${!isSupported ? ' — Preview' : ''}\n\n`;
     }
 
     pagePlugins.forEach((plugin, index) => {
@@ -169,10 +170,8 @@ async function handleButton(interaction, action, page, hasSearch) {
       if (index < pagePlugins.length - 1) content += '\n\n';
     });
 
-    if (isChannelSupported(interaction.channelId)) {
+    if (isSupported) {
       content += '\n_ _\n-# hold this message (not the links) to install';
-    } else {
-      content += '\n_ _\n-# preview';
     }
 
     const row = buildPaginationRow(page, totalPages, !!search);
@@ -215,10 +214,11 @@ module.exports = {
     const pagePlugins = filteredPlugins.slice(start, start + PLUGINS_PER_PAGE);
 
     let content = '';
+    const isSupported = isChannelSupported(interaction.channelId);
     if (search) {
-      content += `**Search results for: "${search}"** (${filteredPlugins.length} found)\n\n`;
+      content += `**Search results for: "${search}"** (${filteredPlugins.length} found)${!isSupported ? ' — Preview' : ''}\n\n`;
     } else {
-      content += `**All Plugins** (Page ${page + 1}/${totalPages})\n\n`;
+      content += `**All Plugins** (Page ${page + 1}/${totalPages})${!isSupported ? ' — Preview' : ''}\n\n`;
     }
 
     pagePlugins.forEach((plugin, index) => {
@@ -226,10 +226,8 @@ module.exports = {
       if (index < pagePlugins.length - 1) content += '\n\n';
     });
 
-    if (isChannelSupported(interaction.channelId)) {
+    if (isSupported) {
       content += '\n_ _\n-# hold this message (not the links) to install';
-    } else {
-      content += '\n_ _\n-# preview';
     }
 
     const row = buildPaginationRow(page, totalPages, !!search);
@@ -253,10 +251,11 @@ module.exports = {
     const pagePlugins = filteredPlugins.slice(start, start + PLUGINS_PER_PAGE);
 
     let content = '';
+    const isSupported = isChannelSupported(message.channelId);
     if (search) {
-      content += `**Search results for: "${search}"** (${filteredPlugins.length} found)\n\n`;
+      content += `**Search results for: "${search}"** (${filteredPlugins.length} found)${!isSupported ? ' — Preview' : ''}\n\n`;
     } else {
-      content += `**All Plugins** (Page ${page + 1}/${totalPages})\n\n`;
+      content += `**All Plugins** (Page ${page + 1}/${totalPages})${!isSupported ? ' — Preview' : ''}\n\n`;
     }
 
     pagePlugins.forEach((plugin, index) => {
@@ -264,10 +263,8 @@ module.exports = {
       if (index < pagePlugins.length - 1) content += '\n\n';
     });
 
-    if (isChannelSupported(message.channelId)) {
+    if (isSupported) {
       content += '\n_ _\n-# hold this message (not the links) to install';
-    } else {
-      content += '\n_ _\n-# [Preview] hold to install only works in support channels';
     }
 
     const row = buildPaginationRow(page, totalPages, !!search);
