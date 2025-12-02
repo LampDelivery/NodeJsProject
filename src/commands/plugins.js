@@ -78,6 +78,13 @@ async function fetchPlugins() {
         if (plugin.name && plugin.url) {
           const authors = Array.isArray(plugin.authors) ? plugin.authors.join(', ') : 'Unknown';
           const normalizedUrl = normalizePluginUrl(plugin.url);
+          
+          // Debug logging for SilentMessages
+          if (plugin.name === 'SilentMessages') {
+            console.log(`SilentMessages original URL: ${plugin.url}`);
+            console.log(`SilentMessages normalized URL: ${normalizedUrl}`);
+          }
+          
           plugins.push({
             name: plugin.name,
             description: plugin.description || 'No description',
