@@ -15,18 +15,18 @@ function clearPluginCache() {
 
 function normalizePluginUrl(url) {
   try {
-    // raw.githubusercontent.com /refs/heads/ → github.com /raw/ conversion
-    const rawGithubRefsMatch = url.match(/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/refs\/heads\/(.+)/);
-    if (rawGithubRefsMatch) {
-      const [, user, repo, pathWithBranch] = rawGithubRefsMatch;
+    // GitHub /raw/refs/heads/branch/ → /raw/branch/ (remove refs/heads)
+    const githubRawRefsMatch = url.match(/github\.com\/([^/]+)\/([^/]+)\/raw\/refs\/heads\/(.+)/);
+    if (githubRawRefsMatch) {
+      const [, user, repo, pathWithBranch] = githubRawRefsMatch;
       return `https://github.com/${user}/${repo}/raw/${pathWithBranch}`;
     }
 
-    // GitHub /refs/heads/ → /raw/ conversion
-    const githubRefsMatch = url.match(/github\.com\/([^/]+)\/([^/]+)\/refs\/heads\/(.+)/);
-    if (githubRefsMatch) {
-      const [, user, repo, pathWithBranch] = githubRefsMatch;
-      return `https://github.com/${user}/${repo}/raw/${pathWithBranch}`;
+    // raw.githubusercontent.com /refs/heads/ → /raw/ conversion
+    const rawGithubRefsMatch = url.match(/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/refs\/heads\/(.+)/);
+    if (rawGithubRefsMatch) {
+      const [, user, repo, pathWithBranch] = rawGithubRefsMatch;
+      return `https://raw.githubusercontent.com/${user}/${repo}/${pathWithBranch}`;
     }
 
     // jsDelivr GitHub with refs/heads: https://cdn.jsdelivr.net/gh/user/repo@refs/heads/branch/path/file.zip
