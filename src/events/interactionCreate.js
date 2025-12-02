@@ -55,7 +55,7 @@ async function handleButton(interaction) {
     if (interaction.customId === 'plugins_info') {
       try {
         await interaction.reply({
-          content: 'Use command in https://discord.com/channels/811255666990907402/847566769258233926 for hold-to-install feature',
+          content: 'Use command in <#847566769258233926> for hold-to-install feature',
           flags: MessageFlags.Ephemeral
         });
       } catch (error) {
