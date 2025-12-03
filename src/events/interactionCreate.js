@@ -100,6 +100,33 @@ async function handleButton(interaction) {
     return;
   }
 
+  if (interaction.customId.startsWith('reviews_')) {
+    const reviewsCommand = interaction.client.commands.get('plugin-reviews');
+    if (reviewsCommand && reviewsCommand.handleButton) {
+      const parts = interaction.customId.split('_');
+      const action = parts[1]; // 'prev' or 'next'
+      const page = parts[2] || '0';
+      const type = parts[3] || 'user'; // 'plugin' or 'user'
+      const identifier = parts[4] || '';
+      const sortBy = parts[5] || 'date';
+      
+      try {
+        await reviewsCommand.handleButton(interaction, action, page, type, identifier, sortBy);
+      } catch (error) {
+        console.error('Error handling reviews button:', error);
+        try {
+          await interaction.update({
+            content: '❌ Error loading reviews. Please try again.',
+            components: []
+          });
+        } catch (updateError) {
+          console.error('Could not update button interaction:', updateError);
+        }
+      }
+    }
+    return;
+  }
+
   if (interaction.customId === 'install_android') {
     const isAliucord = interaction.guildId === '811255666990907402';
     

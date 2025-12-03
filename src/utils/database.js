@@ -55,6 +55,21 @@ async function initializeDatabase() {
     });
     console.log('✓ Bot status table created');
 
+    console.log('Creating plugin_reviews table...');
+    await client.execute({
+      sql: `CREATE TABLE IF NOT EXISTS plugin_reviews (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        plugin_name TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
+        review TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(plugin_name, user_id)
+      )`,
+      args: []
+    });
+    console.log('✓ Plugin reviews table created');
+
     console.log('✓ Database tables initialized successfully');
   } catch (err) {
     console.error('Error initializing database:', err.message || err);
@@ -170,6 +185,89 @@ async function loadBotStatus() {
   }
 }
 
+async function savePluginReview(pluginName, userId, rating, review) {
+  try {
+    await client.execute({
+      sql: 'INSERT OR REPLACE INTO plugin_reviews (plugin_name, user_id, rating, review, created_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)',
+      args: [pluginName.toLowerCase(), userId, rating, review || null]
+    });
+    return true;
+  } catch (err) {
+    console.error('Error saving plugin review:', err);
+    return false;
+  }
+}
+
+async function getPluginReviews(pluginName, sortBy = 'date') {
+  try {
+    const orderClause = sortBy === 'rating' ? 'rating DESC, created_at DESC' : 'created_at DESC';
+    const result = await client.execute({
+      sql: `SELECT * FROM plugin_reviews WHERE plugin_name = ? ORDER BY ${orderClause}`,
+      args: [pluginName.toLowerCase()]
+    });
+    return result.rows;
+  } catch (err) {
+    console.error('Error getting plugin reviews:', err.message || err);
+    return [];
+  }
+}
+
+async function getUserReviews(userId) {
+  try {
+    const result = await client.execute({
+      sql: 'SELECT * FROM plugin_reviews WHERE user_id = ? ORDER BY created_at DESC',
+      args: [userId]
+    });
+    return result.rows;
+  } catch (err) {
+    console.error('Error getting user reviews:', err.message || err);
+    return [];
+  }
+}
+
+async function getReviewById(reviewId) {
+  try {
+    const result = await client.execute({
+      sql: 'SELECT * FROM plugin_reviews WHERE id = ?',
+      args: [reviewId]
+    });
+    return result.rows[0] || null;
+  } catch (err) {
+    console.error('Error getting review by id:', err.message || err);
+    return null;
+  }
+}
+
+async function deleteReview(reviewId) {
+  try {
+    await client.execute({
+      sql: 'DELETE FROM plugin_reviews WHERE id = ?',
+      args: [reviewId]
+    });
+    return true;
+  } catch (err) {
+    console.error('Error deleting review:', err);
+    return false;
+  }
+}
+
+async function getPluginAverageRating(pluginName) {
+  try {
+    const result = await client.execute({
+      sql: 'SELECT AVG(rating) as avg_rating, COUNT(*) as review_count FROM plugin_reviews WHERE plugin_name = ?',
+      args: [pluginName.toLowerCase()]
+    });
+    const row = result.rows[0];
+    return {
+      avgRating: row?.avg_rating ? parseFloat(row.avg_rating).toFixed(1) : null,
+      reviewCount: row?.review_count || 0
+    };
+  } catch (err) {
+    console.error('Error getting plugin average rating:', err.message || err);
+    return { avgRating: null, reviewCount: 0 };
+  }
+}
+
 module.exports = {
   client,
   responders,
@@ -182,5 +280,11 @@ module.exports = {
   deleteMinkyIntervalFromDb,
   loadMinkyIntervalsFromDb,
   saveBotStatus,
-  loadBotStatus
+  loadBotStatus,
+  savePluginReview,
+  getPluginReviews,
+  getUserReviews,
+  getReviewById,
+  deleteReview,
+  getPluginAverageRating
 };
