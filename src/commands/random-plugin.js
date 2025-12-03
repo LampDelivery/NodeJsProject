@@ -2,6 +2,8 @@ const { SlashCommandBuilder, MessageFlags, ActionRowBuilder, ButtonBuilder, Butt
 const { fetchPlugins, filterPlugins } = require('./plugins');
 
 const PLUGINS_PER_PAGE = 5;
+const COOLDOWN_MS = 20000; // 20 seconds
+const userCooldowns = new Map();
 
 const SUPPORTED_CHANNELS = [
   '811261298997460992',
@@ -83,6 +85,21 @@ module.exports = {
     .setDescription('Get a random Aliucord plugin suggestion'),
   
   async execute(interaction) {
+    const userId = interaction.user.id;
+    const now = Date.now();
+    const userLastUsed = userCooldowns.get(userId);
+
+    if (userLastUsed && (now - userLastUsed) < COOLDOWN_MS) {
+      const remainingMs = COOLDOWN_MS - (now - userLastUsed);
+      const remainingSeconds = Math.ceil(remainingMs / 1000);
+      return interaction.reply({
+        content: `⏱️ You're on cooldown. Try again in ${remainingSeconds}s`,
+        flags: MessageFlags.Ephemeral
+      });
+    }
+
+    userCooldowns.set(userId, now);
+
     const deferOptions = { flags: MessageFlags.Ephemeral };
     await interaction.deferReply(deferOptions);
 
@@ -100,7 +117,7 @@ module.exports = {
 
       const isSupported = isChannelSupported(interaction.channelId);
       if (isSupported) {
-        content += '\n_ _\n-# hold this message (not the links) to install';
+        content += '\n​\n-# hold this message (not the links) to install';
       }
 
       const row = buildPaginationRow(0, 1);
@@ -124,6 +141,18 @@ module.exports = {
   },
 
   async executePrefix(message) {
+    const userId = message.author.id;
+    const now = Date.now();
+    const userLastUsed = userCooldowns.get(userId);
+
+    if (userLastUsed && (now - userLastUsed) < COOLDOWN_MS) {
+      const remainingMs = COOLDOWN_MS - (now - userLastUsed);
+      const remainingSeconds = Math.ceil(remainingMs / 1000);
+      return message.reply(`⏱️ You're on cooldown. Try again in ${remainingSeconds}s`);
+    }
+
+    userCooldowns.set(userId, now);
+
     try {
       const allPlugins = await fetchPlugins();
       if (allPlugins.length === 0) {
@@ -138,7 +167,7 @@ module.exports = {
 
       const isSupported = isChannelSupported(message.channelId);
       if (isSupported) {
-        content += '\n_ _\n-# hold this message (not the links) to install';
+        content += '\n​\n-# hold this message (not the links) to install';
       }
 
       const row = buildPaginationRow(0, 1);
