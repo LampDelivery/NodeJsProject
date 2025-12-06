@@ -247,7 +247,7 @@ function formatThemeLine(theme) {
   text += ` by ${escapeMarkdown(theme.author)}`;
   
   if (previewUrl) {
-    text += ` • [Preview](${previewUrl})`;
+    text += ` • [Preview](<${previewUrl}>)`;
   }
   
   return text;
