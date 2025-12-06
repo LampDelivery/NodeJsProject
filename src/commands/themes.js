@@ -1,15 +1,149 @@
-const { SlashCommandBuilder, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 
 const THEMES_URL = 'https://rautobot.github.io/themes-repo/data.json';
-const THEMES_PER_PAGE = 5;
+const THEMES_CHANNEL_ID = '824357609778708580';
+const ALIUCORD_GUILD_ID = '811255666990907402';
+const THEMES_PER_PAGE = 1;
 
 let cachedThemes = [];
 let cacheTimestamp = 0;
+let previewCache = new Map();
+let previewCacheTimestamp = 0;
 const CACHE_DURATION = 12 * 60 * 60 * 1000; // 12 hours
+const PREVIEW_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
+let discordClient = null;
+
+function setClient(client) {
+  discordClient = client;
+}
 
 function clearThemeCache() {
   cachedThemes = [];
   cacheTimestamp = 0;
+}
+
+function clearPreviewCache() {
+  previewCache = new Map();
+  previewCacheTimestamp = 0;
+}
+
+function normalizeUrlForMatching(url) {
+  let normalized = url.toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/\/$/, '');
+  
+  if (normalized.includes('cdn.statically.io/gh/')) {
+    normalized = normalized
+      .replace('cdn.statically.io/gh/', 'raw.githubusercontent.com/')
+      .replace(/\/main\//, '/refs/heads/main/')
+      .replace(/\/master\//, '/refs/heads/master/');
+  }
+  
+  if (normalized.includes('cdn.statically.io/gl/')) {
+    const match = normalized.match(/cdn\.statically\.io\/gl\/([^/]+)\/([^/]+)\/([^/]+)\/(.*)/);
+    if (match) {
+      const [, user, repo, branch, path] = match;
+      normalized = `gitlab.com/${user}/${repo}/-/raw/${branch}/${path}`;
+    }
+  }
+  
+  normalized = normalized
+    .replace('/refs/heads/', '/')
+    .replace('raw.githubusercontent.com/', '')
+    .replace('github.com/', '')
+    .replace('/raw/', '/');
+  
+  return normalized;
+}
+
+async function fetchPreviewsFromChannel() {
+  const now = Date.now();
+  if (previewCache.size > 0 && (now - previewCacheTimestamp) < PREVIEW_CACHE_DURATION) {
+    return previewCache;
+  }
+
+  if (!discordClient) {
+    console.log('Discord client not available for fetching previews');
+    return previewCache;
+  }
+
+  try {
+    const channel = await discordClient.channels.fetch(THEMES_CHANNEL_ID).catch(() => null);
+    if (!channel) {
+      console.log('Could not fetch themes channel');
+      return previewCache;
+    }
+
+    console.log('Fetching theme previews from #themes channel...');
+    const newPreviewCache = new Map();
+    let lastMessageId = null;
+    let totalFetched = 0;
+    const maxMessages = 1000;
+
+    while (totalFetched < maxMessages) {
+      const options = { limit: 100 };
+      if (lastMessageId) {
+        options.before = lastMessageId;
+      }
+
+      const messages = await channel.messages.fetch(options);
+      if (messages.size === 0) break;
+
+      for (const message of messages.values()) {
+        const imageAttachments = message.attachments.filter(att => 
+          att.contentType?.startsWith('image/') || 
+          /\.(png|jpg|jpeg|gif|webp)$/i.test(att.name || '')
+        );
+
+        if (imageAttachments.size > 0) {
+          const content = message.content || '';
+          
+          const urlMatches = content.match(/https?:\/\/[^\s<>"]+\.json/gi) || [];
+          
+          for (const jsonUrl of urlMatches) {
+            const normalizedUrl = normalizeUrlForMatching(jsonUrl);
+            const previewUrl = imageAttachments.first().url;
+            newPreviewCache.set(normalizedUrl, previewUrl);
+          }
+        }
+      }
+
+      totalFetched += messages.size;
+      lastMessageId = messages.last().id;
+      
+      if (messages.size < 100) break;
+    }
+
+    previewCache = newPreviewCache;
+    previewCacheTimestamp = now;
+    console.log(`Cached ${newPreviewCache.size} theme previews from ${totalFetched} messages`);
+    return previewCache;
+  } catch (err) {
+    console.error('Error fetching theme previews:', err);
+    return previewCache;
+  }
+}
+
+function getPreviewForTheme(theme) {
+  const normalizedThemeUrl = normalizeUrlForMatching(theme.url);
+  
+  if (previewCache.has(normalizedThemeUrl)) {
+    return previewCache.get(normalizedThemeUrl);
+  }
+  
+  for (const [cachedUrl, previewUrl] of previewCache.entries()) {
+    if (cachedUrl.includes(normalizedThemeUrl) || normalizedThemeUrl.includes(cachedUrl)) {
+      return previewUrl;
+    }
+    
+    const themeFilename = theme.filename?.toLowerCase() || '';
+    if (themeFilename && cachedUrl.endsWith(themeFilename)) {
+      return previewUrl;
+    }
+  }
+  
+  return null;
 }
 
 function normalizeThemeUrl(url) {
@@ -76,6 +210,7 @@ async function fetchThemes() {
 async function initializeThemeCache() {
   console.log('Initializing theme cache...');
   await fetchThemes();
+  await fetchPreviewsFromChannel();
 }
 
 function filterThemes(themes, search, author) {
@@ -102,13 +237,27 @@ function escapeMarkdown(text) {
   return text.replace(/[*_~`[\]()]/g, '\\$&');
 }
 
-function formatThemeLine(theme) {
-  let text = `[${theme.name}](${theme.url})`;
-  if (theme.version) {
-    text += ` v${escapeMarkdown(theme.version)}`;
+function buildThemeEmbed(theme) {
+  const previewUrl = getPreviewForTheme(theme);
+  
+  const embed = new EmbedBuilder()
+    .setTitle(theme.name)
+    .setColor(0x00D166)
+    .setDescription(`**Version:** ${theme.version || 'N/A'}\n**Author:** ${escapeMarkdown(theme.author)}`);
+  
+  if (theme.url) {
+    embed.setURL(theme.url);
   }
-  text += `\nby ${escapeMarkdown(theme.author)}`;
-  return text;
+  
+  if (previewUrl) {
+    embed.setImage(previewUrl);
+  }
+  
+  if (theme.repoUrl) {
+    embed.addFields({ name: 'Repository', value: `[View on GitHub](${theme.repoUrl})`, inline: true });
+  }
+  
+  return embed;
 }
 
 function encodeFilter(str) {
@@ -156,7 +305,7 @@ async function handleButton(interaction, action, page, encodedSearch, encodedAut
 
     const totalPages = Math.ceil(filteredThemes.length / THEMES_PER_PAGE);
     if (page < 0 || page >= totalPages) {
-      return await interaction.update({ content: 'Invalid page.', components: [] });
+      return await interaction.update({ content: 'Invalid page.', embeds: [], components: [] });
     }
 
     const start = page * THEMES_PER_PAGE;
@@ -168,20 +317,17 @@ async function handleButton(interaction, action, page, encodedSearch, encodedAut
       let filterText = [];
       if (search) filterText.push(`"${search}"`);
       if (author) filterText.push(`by ${author}`);
-      content += `**Themes ${filterText.join(' ')}** (${filteredThemes.length} found)\n\n`;
+      content = `**Themes ${filterText.join(' ')}** (${page + 1}/${totalPages} - ${filteredThemes.length} found)`;
     } else {
-      content += `**All Themes** (Page ${page + 1}/${totalPages})\n\n`;
+      content = `**All Themes** (${page + 1}/${totalPages})`;
     }
+    
+    content += '\n-# hold this message (not the links) to install';
 
-    pageThemes.forEach((theme, index) => {
-      content += formatThemeLine(theme);
-      if (index < pageThemes.length - 1) content += '\n\n';
-    });
-
-    content += '\n​\n-# hold this message (not the links) to install';
-
+    const embeds = pageThemes.map(theme => buildThemeEmbed(theme));
     const row = buildPaginationRow(page, totalPages, search, author);
-    await interaction.update({ content, components: [row] });
+    
+    await interaction.update({ content, embeds, components: [row] });
     
   } catch (err) {
     console.error('Error in handleButton:', err);
@@ -218,6 +364,8 @@ module.exports = {
         .setRequired(false)),
 
   async execute(interaction) {
+    setClient(interaction.client);
+    
     const send = interaction.options.getBoolean('send') ?? false;
     const deferOptions = send ? {} : { flags: MessageFlags.Ephemeral };
     await interaction.deferReply(deferOptions);
@@ -231,6 +379,10 @@ module.exports = {
       return interaction.editReply('No themes found.');
     }
 
+    if (previewCache.size === 0) {
+      await fetchPreviewsFromChannel();
+    }
+
     const page = 0;
     const totalPages = Math.ceil(filteredThemes.length / THEMES_PER_PAGE);
     const start = page * THEMES_PER_PAGE;
@@ -242,23 +394,22 @@ module.exports = {
       let filterText = [];
       if (search) filterText.push(`"${search}"`);
       if (author) filterText.push(`by ${author}`);
-      content += `**Themes ${filterText.join(' ')}** (${filteredThemes.length} found)\n\n`;
+      content = `**Themes ${filterText.join(' ')}** (${page + 1}/${totalPages} - ${filteredThemes.length} found)`;
     } else {
-      content += `**All Themes** (Page ${page + 1}/${totalPages})\n\n`;
+      content = `**All Themes** (${page + 1}/${totalPages})`;
     }
+    
+    content += '\n-# hold this message (not the links) to install';
 
-    pageThemes.forEach((theme, index) => {
-      content += formatThemeLine(theme);
-      if (index < pageThemes.length - 1) content += '\n\n';
-    });
-
-    content += '\n​\n-# hold this message (not the links) to install';
-
+    const embeds = pageThemes.map(theme => buildThemeEmbed(theme));
     const row = buildPaginationRow(page, totalPages, search, author);
-    await interaction.editReply({ content, components: [row] });
+    
+    await interaction.editReply({ content, embeds, components: [row] });
   },
 
   async executePrefix(message, args) {
+    setClient(message.client);
+    
     let search = null;
     let author = null;
     
@@ -285,6 +436,10 @@ module.exports = {
       return;
     }
 
+    if (previewCache.size === 0) {
+      await fetchPreviewsFromChannel();
+    }
+
     const page = 0;
     const totalPages = Math.ceil(filteredThemes.length / THEMES_PER_PAGE);
     const start = page * THEMES_PER_PAGE;
@@ -296,20 +451,17 @@ module.exports = {
       let filterText = [];
       if (search) filterText.push(`"${search}"`);
       if (author) filterText.push(`by ${author}`);
-      content += `**Themes ${filterText.join(' ')}** (${filteredThemes.length} found)\n\n`;
+      content = `**Themes ${filterText.join(' ')}** (${page + 1}/${totalPages} - ${filteredThemes.length} found)`;
     } else {
-      content += `**All Themes** (Page ${page + 1}/${totalPages})\n\n`;
+      content = `**All Themes** (${page + 1}/${totalPages})`;
     }
+    
+    content += '\n-# hold this message (not the links) to install';
 
-    pageThemes.forEach((theme, index) => {
-      content += formatThemeLine(theme);
-      if (index < pageThemes.length - 1) content += '\n\n';
-    });
-
-    content += '\n​\n-# hold this message (not the links) to install';
-
+    const embeds = pageThemes.map(theme => buildThemeEmbed(theme));
     const row = buildPaginationRow(page, totalPages, search, author);
-    await message.reply({ content, components: [row] });
+    
+    await message.reply({ content, embeds, components: [row] });
   },
 
   async autocomplete(interaction) {
@@ -355,5 +507,6 @@ module.exports = {
   fetchThemes,
   filterThemes,
   initializeThemeCache,
-  clearThemeCache
+  clearThemeCache,
+  setClient
 };

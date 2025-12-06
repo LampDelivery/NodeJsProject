@@ -41,6 +41,7 @@ module.exports = {
     pluginsCommand.clearPluginCache();
     await pluginsCommand.initializePluginCache();
     
+    themesCommand.setClient(client);
     themesCommand.clearThemeCache();
     await themesCommand.initializeThemeCache();
     
