@@ -10,5 +10,13 @@ npm-debug.log*
 *.sqlite3
 
 # Replit config files
-replit.md
 .replit
+replit.md
+.local/
+.cache/
+.config/
+.upm/
+.nix/
+generated-icon.png
+replit.nix
+.breakpoints
