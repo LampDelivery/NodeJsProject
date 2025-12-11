@@ -17,13 +17,13 @@ module.exports = {
           inline: false
         },
         {
-          name: '🐱 Fun Commands',
-          value: '`/minky` - Get a random Minky cat image\n`/minkyinterval [interval]` - Auto-post Minky images (seconds, 0 to stop)',
+          name: '🎨 Theme Commands',
+          value: '`/themes [search]` - Browse all Aliucord themes',
           inline: false
         },
         {
-          name: '⚙️ Server Commands',
-          value: '`/autoresponder [action]` - Manage custom autoresponders',
+          name: '🐱 Fun Commands',
+          value: '`/minky` - Get a random Minky cat image\n`/minkyinterval [interval]` - Auto-post Minky images (seconds, 0 to stop)',
           inline: false
         },
         {
@@ -53,13 +53,13 @@ module.exports = {
           inline: false
         },
         {
-          name: '🐱 Fun Commands',
-          value: '`/minky` - Get a random Minky cat image\n`/minkyinterval [interval]` - Auto-post Minky images (seconds, 0 to stop)',
+          name: '🎨 Theme Commands',
+          value: '`/themes [search]` - Browse all Aliucord themes',
           inline: false
         },
         {
-          name: '⚙️ Server Commands',
-          value: '`/autoresponder [action]` - Manage custom autoresponders',
+          name: '🐱 Fun Commands',
+          value: '`/minky` - Get a random Minky cat image\n`/minkyinterval [interval]` - Auto-post Minky images (seconds, 0 to stop)',
           inline: false
         },
         {

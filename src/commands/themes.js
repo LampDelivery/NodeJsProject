@@ -292,7 +292,7 @@ function decodeFilter(str) {
   return Buffer.from(padded, 'base64').toString('utf8');
 }
 
-function buildPaginationRow(page, totalPages, search = null, author = null) {
+function buildPaginationRow(page, totalPages, search = null, author = null, hasPreviewsOnPage = true) {
   const row = new ActionRowBuilder();
   const encodedSearch = encodeFilter(search || '');
   const encodedAuthor = encodeFilter(author || '');
@@ -312,7 +312,8 @@ function buildPaginationRow(page, totalPages, search = null, author = null) {
   const previewBtn = new ButtonBuilder()
     .setCustomId(`themes_preview_${page}_${encodedSearch}_${encodedAuthor}`)
     .setLabel('Previews')
-    .setStyle(ButtonStyle.Secondary);
+    .setStyle(ButtonStyle.Secondary)
+    .setDisabled(!hasPreviewsOnPage);
   
   row.addComponents(prevBtn, nextBtn, previewBtn);
   return row;
@@ -389,7 +390,8 @@ async function handleButton(interaction, action, page, encodedSearch, encodedAut
 
     content += '\n​\n-# hold this message (not the links) to install';
 
-    const row = buildPaginationRow(page, totalPages, search, author);
+    const hasPreviewsOnPage = pageThemes.some(theme => getPreviewForTheme(theme));
+    const row = buildPaginationRow(page, totalPages, search, author, hasPreviewsOnPage);
     await interaction.update({ content, components: [row] });
     
   } catch (err) {
@@ -469,7 +471,8 @@ module.exports = {
 
     content += '\n​\n-# hold this message (not the links) to install';
 
-    const row = buildPaginationRow(page, totalPages, search, author);
+    const hasPreviewsOnPage = pageThemes.some(theme => getPreviewForTheme(theme));
+    const row = buildPaginationRow(page, totalPages, search, author, hasPreviewsOnPage);
     await interaction.editReply({ content, components: [row] });
   },
 
@@ -529,7 +532,8 @@ module.exports = {
 
     content += '\n​\n-# hold this message (not the links) to install';
 
-    const row = buildPaginationRow(page, totalPages, search, author);
+    const hasPreviewsOnPage = pageThemes.some(theme => getPreviewForTheme(theme));
+    const row = buildPaginationRow(page, totalPages, search, author, hasPreviewsOnPage);
     await message.reply({ content, components: [row] });
   },
 

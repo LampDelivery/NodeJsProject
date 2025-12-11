@@ -47,9 +47,6 @@ module.exports = {
         .map(([author, count]) => `• ${author} - **${count}** plugins`)
         .join('\n') || 'No data';
       
-      // Latest plugins (first in manifest)
-      const latestPlugins = allPlugins.slice(0, 5).map(p => `• ${p.name}`).join('\n');
-
       // Top reviewed plugins
       const topReviewed = await getTopReviewedPlugins(5);
       const topReviewedText = topReviewed.length > 0
@@ -60,11 +57,6 @@ module.exports = {
         .setColor(0x5865F2)
         .setTitle('📊 Plugin Statistics')
         .addFields(
-          {
-            name: '✨ Latest Plugins',
-            value: latestPlugins,
-            inline: false
-          },
           {
             name: '⭐ Most Reviewed Plugins',
             value: topReviewedText,
@@ -133,9 +125,6 @@ module.exports = {
         .map(([author, count]) => `• ${author} - **${count}** plugins`)
         .join('\n') || 'No data';
       
-      // Latest plugins (first in manifest)
-      const latestPlugins = allPlugins.slice(0, 5).map(p => `• ${p.name}`).join('\n');
-
       // Top reviewed plugins
       const topReviewed = await getTopReviewedPlugins(5);
       const topReviewedText = topReviewed.length > 0
@@ -146,11 +135,6 @@ module.exports = {
         .setColor(0x5865F2)
         .setTitle('📊 Plugin Statistics')
         .addFields(
-          {
-            name: '✨ Latest Plugins',
-            value: latestPlugins,
-            inline: false
-          },
           {
             name: '⭐ Most Reviewed Plugins',
             value: topReviewedText,
