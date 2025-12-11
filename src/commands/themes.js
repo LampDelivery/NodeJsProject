@@ -288,9 +288,8 @@ function buildPaginationRow(page, totalPages, search = null, author = null) {
   
   const previewBtn = new ButtonBuilder()
     .setCustomId(`themes_preview_${page}_${encodedSearch}_${encodedAuthor}`)
-    .setLabel('Show Previews')
-    .setStyle(ButtonStyle.Secondary)
-    .setEmoji('🖼️');
+    .setLabel('Previews')
+    .setStyle(ButtonStyle.Secondary);
   
   row.addComponents(prevBtn, nextBtn, previewBtn);
   return row;
