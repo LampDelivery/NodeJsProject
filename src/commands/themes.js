@@ -42,7 +42,15 @@ function clearPreviewCache() {
 }
 
 function normalizeUrlForMatching(url) {
-  let normalized = url.toLowerCase()
+  // First decode any URL-encoded characters for consistent matching
+  let normalized;
+  try {
+    normalized = decodeURIComponent(url);
+  } catch {
+    normalized = url;
+  }
+  
+  normalized = normalized.toLowerCase()
     .replace(/^https?:\/\//, '')
     .replace(/\/$/, '');
   
@@ -113,12 +121,23 @@ async function fetchPreviewsFromChannel() {
         if (imageAttachments.size > 0) {
           const content = message.content || '';
           
-          const urlMatches = content.match(/https?:\/\/[^\s<>"]+\.json/gi) || [];
+          // Extract URLs more robustly - handle both encoded and unencoded URLs
+          const urlMatches = content.match(/https?:\/\/[^\s<>"()[\]]+/gi) || [];
           
-          for (const jsonUrl of urlMatches) {
-            const normalizedUrl = normalizeUrlForMatching(jsonUrl);
-            const discordUrl = imageAttachments.first().url;
-            uploadQueue.push({ normalizedUrl, discordUrl });
+          for (const rawUrl of urlMatches) {
+            // Decode URL and check if it ends with .json
+            let decodedUrl;
+            try {
+              decodedUrl = decodeURIComponent(rawUrl);
+            } catch {
+              decodedUrl = rawUrl;
+            }
+            
+            if (decodedUrl.toLowerCase().endsWith('.json') || rawUrl.toLowerCase().endsWith('.json')) {
+              const normalizedUrl = normalizeUrlForMatching(rawUrl);
+              const discordUrl = imageAttachments.first().url;
+              uploadQueue.push({ normalizedUrl, discordUrl });
+            }
           }
         }
       }
@@ -170,22 +189,30 @@ function getPreviewForTheme(theme) {
 }
 
 function normalizeThemeUrl(url) {
-  if (url.includes("cdn.statically.io/gh/")) {
-    return url
+  // Decode URL first for consistent handling
+  let decodedUrl;
+  try {
+    decodedUrl = decodeURIComponent(url);
+  } catch {
+    decodedUrl = url;
+  }
+  
+  if (decodedUrl.includes("cdn.statically.io/gh/")) {
+    return decodedUrl
       .replace("cdn.statically.io/gh/", "raw.githubusercontent.com/")
       .replace("/main/", "/refs/heads/main/")
       .replace("/master/", "/refs/heads/master/");
   }
   
-  if (url.includes("cdn.statically.io/gl/")) {
-    const match = url.match(/cdn\.statically\.io\/gl\/([^/]+)\/([^/]+)\/([^/]+)\/(.*)/);
+  if (decodedUrl.includes("cdn.statically.io/gl/")) {
+    const match = decodedUrl.match(/cdn\.statically\.io\/gl\/([^/]+)\/([^/]+)\/([^/]+)\/(.*)/);
     if (match) {
       const [, user, repo, branch, path] = match;
       return `https://gitlab.com/${user}/${repo}/-/raw/${branch}/${path}`;
     }
   }
   
-  return url;
+  return decodedUrl;
 }
 
 async function fetchThemes() {
