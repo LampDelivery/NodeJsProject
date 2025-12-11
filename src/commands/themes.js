@@ -295,14 +295,20 @@ function formatThemeLine(theme) {
   const previewUrl = getPreviewForTheme(theme);
   
   const safeName = escapeMarkdownLink(theme.name);
-  let text = `[${safeName}](${theme.url})`;
+  // Wrap URL in <> if it contains parentheses to prevent markdown parsing issues
+  const urlHasParens = theme.url.includes('(') || theme.url.includes(')');
+  const formattedUrl = urlHasParens ? `<${theme.url}>` : theme.url;
+  
+  let text = `[${safeName}](${formattedUrl})`;
   if (theme.version) {
     text += ` v${escapeMarkdown(theme.version)}`;
   }
   text += ` by ${escapeMarkdown(theme.author)}`;
   
   if (previewUrl) {
-    text += ` • [Preview](${previewUrl})`;
+    const previewHasParens = previewUrl.includes('(') || previewUrl.includes(')');
+    const formattedPreview = previewHasParens ? `<${previewUrl}>` : previewUrl;
+    text += ` • [Preview](${formattedPreview})`;
   }
   
   return text;
