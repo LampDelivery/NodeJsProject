@@ -288,26 +288,19 @@ function formatUrlForMarkdown(url) {
 }
 
 function formatThemeLine(theme) {
-  const previewUrl = getPreviewForTheme(theme);
-  
   // Clean parentheses from display name, escape brackets
   const cleanedName = cleanThemeName(theme.name);
   const safeName = escapeMarkdownLink(cleanedName);
   const formattedUrl = formatUrlForMarkdown(theme.url);
   
-  let text = `[${safeName}](${formattedUrl})`;
+  let text = `[${safeName}](<${formattedUrl}>)`;
   
-  // Use -# for smaller text on version, author, and preview
+  // Use -# for smaller text on version and author only (no preview embeds)
   let smallText = '';
   if (theme.version) {
     smallText += `v${escapeMarkdown(theme.version)} `;
   }
   smallText += `by ${escapeMarkdown(theme.author)}`;
-  
-  if (previewUrl) {
-    const formattedPreview = formatUrlForMarkdown(previewUrl);
-    smallText += ` • [Preview](${formattedPreview})`;
-  }
   
   text += `\n-# ${smallText}`;
   
