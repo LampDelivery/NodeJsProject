@@ -32,12 +32,11 @@ async function setSticky(guildId, channel, content, cooldownSeconds = 120, inclu
     const cooldownMs = Math.max(0, Math.floor(Number(cooldownSeconds) || 0) * 1000);
 
     await client.execute({
-      sql: `INSERT INTO sticky_messages (guild_id, channel_id, content, last_message_id, cooldown_ms, include_warning)
-            VALUES (?, ?, ?, COALESCE((SELECT last_message_id FROM sticky_messages WHERE guild_id = ? AND channel_id = ?), NULL), ?, ?)
-            ON CONFLICT(guild_id, channel_id) DO UPDATE SET
-              content = excluded.content,
-              cooldown_ms = excluded.cooldown_ms,
-              include_warning = excluded.include_warning`,
+      sql: `INSERT OR REPLACE INTO sticky_messages (
+              guild_id, channel_id, content, last_message_id, cooldown_ms, include_warning
+            ) VALUES (
+              ?, ?, ?, COALESCE((SELECT last_message_id FROM sticky_messages WHERE guild_id = ? AND channel_id = ?), NULL), ?, ?
+            )`,
       args: [guildId, channelId, content, guildId, channelId, cooldownMs, includeWarning ? 1 : 0]
     });
 
