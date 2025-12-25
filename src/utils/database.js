@@ -9,6 +9,7 @@ const client = createClient({
 
 const responders = {};
 const minkyIntervals = {};
+const { runMigrations } = require('./migrations');
 
 async function initializeDatabase() {
   try {
@@ -20,8 +21,7 @@ async function initializeDatabase() {
         guild_id TEXT NOT NULL,
         trigger_phrase TEXT NOT NULL,
         response TEXT NOT NULL,
-        channel_id TEXT,
-  loadStickyMessages,
+        channel_id TEXT
       )`,
       args: []
     });
@@ -70,39 +70,8 @@ async function initializeDatabase() {
     });
     console.log('✓ Plugin reviews table created');
     
-    // Create sticky_messages table if it doesn't exist
-    console.log('Creating sticky_messages table...');
-    await client.execute({
-      sql: `CREATE TABLE IF NOT EXISTS sticky_messages (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        guild_id TEXT NOT NULL,
-        channel_id TEXT NOT NULL,
-        content TEXT NOT NULL,
-        last_message_id TEXT,
-        cooldown_ms INTEGER NOT NULL DEFAULT 120000,
-        include_warning INTEGER NOT NULL DEFAULT 1,
-        UNIQUE(guild_id, channel_id)
-      )`,
-      args: []
-    });
-    console.log('✓ Sticky messages table created');
-
-    // Attempt migrations for older schemas (ignore if columns already exist)
-    try {
-      await client.execute({
-        sql: 'ALTER TABLE sticky_messages ADD COLUMN cooldown_ms INTEGER NOT NULL DEFAULT 120000',
-        args: []
-      });
-      console.log('✓ Added cooldown_ms to sticky_messages');
-    } catch (_) { /* column exists */ }
-
-    try {
-      await client.execute({
-        sql: 'ALTER TABLE sticky_messages ADD COLUMN include_warning INTEGER NOT NULL DEFAULT 1',
-        args: []
-      });
-      console.log('✓ Added include_warning to sticky_messages');
-    } catch (_) { /* column exists */ }
+    // Run schema migrations (sticky messages and future changes)
+    await runMigrations(client);
 
     console.log('✓ Database tables initialized successfully');
   } catch (err) {
@@ -110,50 +79,20 @@ async function initializeDatabase() {
   }
 }
 
-async function saveStickyMessage(guildId, channelId, content, cooldownMs, includeWarning) {
+async function loadStickyMessages() {
   try {
-    await client.execute({
-      sql: `INSERT OR REPLACE INTO sticky_messages (
-              guild_id, channel_id, content, last_message_id, cooldown_ms, include_warning
-            ) VALUES (
-              ?, ?, ?, COALESCE((SELECT last_message_id FROM sticky_messages WHERE guild_id = ? AND channel_id = ?), NULL), ?, ?
-            )`,
-      args: [guildId, channelId, content, guildId, channelId, cooldownMs, includeWarning ? 1 : 0]
+    const result = await client.execute({
+      sql: 'SELECT guild_id, channel_id, content, last_message_id, cooldown_ms, include_warning FROM sticky_messages',
+      args: []
     });
-    return true;
+    return result.rows;
   } catch (err) {
-    console.error('Error saving sticky message:', err && err.message ? err.message : err);
-    return false;
-  }
-}
-
-async function deleteStickyMessage(guildId, channelId) {
-  try {
-    await client.execute({
-      sql: 'DELETE FROM sticky_messages WHERE guild_id = ? AND channel_id = ?',
-      args: [guildId, channelId]
-    });
-    return true;
-  } catch (err) {
-    console.error('Error deleting sticky message:', err && err.message ? err.message : err);
-    return false;
+    console.error('Error loading sticky messages:', err.message || err);
+    return [];
   }
 }
 
 async function loadAutoresponders() {
-
-  async function loadStickyMessages() {
-    try {
-      const result = await client.execute({
-        sql: 'SELECT guild_id, channel_id, content, last_message_id, cooldown_ms, include_warning FROM sticky_messages',
-        args: []
-      });
-      return result.rows;
-    } catch (err) {
-      console.error('Error loading sticky messages:', err.message || err);
-      return [];
-    }
-  }
   try {
     const result = await client.execute({
       sql: 'SELECT * FROM autoresponders',
