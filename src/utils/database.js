@@ -79,11 +79,30 @@ async function initializeDatabase() {
         channel_id TEXT NOT NULL,
         content TEXT NOT NULL,
         last_message_id TEXT,
+        cooldown_ms INTEGER NOT NULL DEFAULT 120000,
+        include_warning INTEGER NOT NULL DEFAULT 1,
         UNIQUE(guild_id, channel_id)
       )`,
       args: []
     });
     console.log('✓ Sticky messages table created');
+
+    // Attempt migrations for older schemas (ignore if columns already exist)
+    try {
+      await client.execute({
+        sql: 'ALTER TABLE sticky_messages ADD COLUMN cooldown_ms INTEGER NOT NULL DEFAULT 120000',
+        args: []
+      });
+      console.log('✓ Added cooldown_ms to sticky_messages');
+    } catch (_) { /* column exists */ }
+
+    try {
+      await client.execute({
+        sql: 'ALTER TABLE sticky_messages ADD COLUMN include_warning INTEGER NOT NULL DEFAULT 1',
+        args: []
+      });
+      console.log('✓ Added include_warning to sticky_messages');
+    } catch (_) { /* column exists */ }
 
     console.log('✓ Database tables initialized successfully');
   } catch (err) {

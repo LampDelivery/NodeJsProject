@@ -14,7 +14,6 @@ module.exports = {
       return;
     }
 
-    // Always process sticky behavior for guild messages
     await handleStickyMessage(message);
 
     const parsed = parseMessage(message);

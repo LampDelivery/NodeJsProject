@@ -1,20 +1,23 @@
 const { client } = require('./database');
 
-// In-memory cache of sticky configs by channelId
-const stickies = {}; // { [channelId]: { guildId, content, lastMessageId } }
+const stickies = {};
 
 async function initializeStickyManager() {
   try {
-    // Schema creation is handled in initializeDatabase(); simply load rows.
     const result = await client.execute({
-      sql: 'SELECT guild_id, channel_id, content, last_message_id FROM sticky_messages',
+      sql: 'SELECT guild_id, channel_id, content, last_message_id, cooldown_ms, include_warning FROM sticky_messages',
       args: []
     });
     for (const row of result.rows) {
+      const cooldownMs = Number(row.cooldown_ms ?? 120000);
+      const includeWarning = (row.include_warning == null) ? true : (Number(row.include_warning) !== 0);
       stickies[row.channel_id] = {
         guildId: row.guild_id,
         content: row.content,
-        lastMessageId: row.last_message_id || null
+        cooldownMs: isNaN(cooldownMs) ? 120000 : cooldownMs,
+        includeWarning,
+        lastMessageId: row.last_message_id || null,
+        lastSentMs: 0
       };
     }
     console.log(`Loaded ${Object.keys(stickies).length} sticky configs`);
@@ -23,21 +26,32 @@ async function initializeStickyManager() {
   }
 }
 
-async function setSticky(guildId, channel, content) {
+async function setSticky(guildId, channel, content, cooldownSeconds = 120, includeWarning = true) {
   const channelId = channel.id;
   try {
-    // Save to DB
-    await client.execute({
-      sql: 'INSERT OR REPLACE INTO sticky_messages (guild_id, channel_id, content, last_message_id) VALUES (?, ?, ?, COALESCE((SELECT last_message_id FROM sticky_messages WHERE guild_id = ? AND channel_id = ?), NULL))',
-      args: [guildId, channelId, content, guildId, channelId]
-    });
-    // Update cache
-    if (!stickies[channelId]) stickies[channelId] = { guildId, content, lastMessageId: null };
-    stickies[channelId].guildId = guildId;
-    stickies[channelId].content = content;
+    const cooldownMs = Math.max(0, Math.floor(Number(cooldownSeconds) || 0) * 1000);
 
-    // Repost immediately: delete old sticky if present, then send new one
-    await repostSticky(channel);
+    // Upsert while preserving last_message_id
+    await client.execute({
+      sql: `INSERT INTO sticky_messages (guild_id, channel_id, content, last_message_id, cooldown_ms, include_warning)
+            VALUES (?, ?, ?, COALESCE((SELECT last_message_id FROM sticky_messages WHERE guild_id = ? AND channel_id = ?), NULL), ?, ?)
+            ON CONFLICT(guild_id, channel_id) DO UPDATE SET
+              content = excluded.content,
+              cooldown_ms = excluded.cooldown_ms,
+              include_warning = excluded.include_warning`,
+      args: [guildId, channelId, content, guildId, channelId, cooldownMs, includeWarning ? 1 : 0]
+    });
+
+    // Update cache (do not immediately repost; match Go behavior)
+    stickies[channelId] = {
+      guildId,
+      content,
+      cooldownMs,
+      includeWarning: !!includeWarning,
+      lastMessageId: stickies[channelId]?.lastMessageId || null,
+      lastSentMs: 0
+    };
+
     return true;
   } catch (err) {
     console.error('Error setting sticky:', err.message || err);
@@ -48,20 +62,17 @@ async function setSticky(guildId, channel, content) {
 async function disableSticky(guildId, channel) {
   const channelId = channel.id;
   try {
-    // Delete DB entry
     await client.execute({
       sql: 'DELETE FROM sticky_messages WHERE guild_id = ? AND channel_id = ?',
       args: [guildId, channelId]
     });
 
-    // Delete any last sticky message
     const lastId = stickies[channelId]?.lastMessageId;
     if (lastId) {
       try {
         const msg = await channel.messages.fetch(lastId);
         if (msg && msg.deletable) await msg.delete();
       } catch (_) {
-        // ignore fetch/delete errors
       }
     }
 
@@ -73,23 +84,22 @@ async function disableSticky(guildId, channel) {
   }
 }
 
-function getSticky(channelId) {
-  return stickies[channelId] || null;
-}
 
 async function handleMessage(message) {
-  // Only act in guild text channels
   if (!message.guild) return;
   const channelId = message.channel.id;
   const cfg = stickies[channelId];
   if (!cfg) return;
 
-  // Prevent reacting to our own sticky repost
-  if (message.author.bot && message.id === cfg.lastMessageId) return;
+  if (message.author.bot) return;
 
-  // Repost sticky to keep it at the bottom
+  const now = Date.now();
+  const elapsed = now - (cfg.lastSentMs || 0);
+  if (cfg.cooldownMs != null && elapsed < cfg.cooldownMs) return;
+
   try {
     await repostSticky(message.channel);
+    cfg.lastSentMs = now;
   } catch (err) {
     console.error('Error handling sticky on message:', err.message || err);
   }
@@ -100,30 +110,27 @@ async function repostSticky(channel) {
   const cfg = stickies[channelId];
   if (!cfg) return;
 
-  // Delete old sticky if present
   if (cfg.lastMessageId) {
     try {
       const msg = await channel.messages.fetch(cfg.lastMessageId);
       if (msg && msg.deletable) await msg.delete();
     } catch (_) {
-      // ignore fetch/delete errors (message may be gone or no perms)
     }
   }
 
-  // Send new sticky
-  const sent = await channel.send({ content: cfg.content });
+  const content = cfg.includeWarning ? `**__Stickied message:__**\n${cfg.content}` : cfg.content;
+
+  const sent = await channel.send({ content, allowedMentions: { parse: [] } });
 
   // Update cache and DB with new last_message_id
   cfg.lastMessageId = sent.id;
   try {
-    // Prefer updating by both guild_id and channel_id to match schema
     if (cfg.guildId) {
       await client.execute({
         sql: 'UPDATE sticky_messages SET last_message_id = ? WHERE guild_id = ? AND channel_id = ?',
         args: [sent.id, cfg.guildId, channelId]
       });
     } else {
-      // Fallback for legacy rows without guild_id
       await client.execute({
         sql: 'UPDATE sticky_messages SET last_message_id = ? WHERE channel_id = ?',
         args: [sent.id, channelId]
@@ -138,6 +145,5 @@ module.exports = {
   initializeStickyManager,
   setSticky,
   disableSticky,
-  getSticky,
   handleMessage
 };

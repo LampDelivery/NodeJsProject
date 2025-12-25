@@ -1,39 +1,47 @@
 const { SlashCommandBuilder, MessageFlags, PermissionsBitField } = require('discord.js');
-const { initializeStickyManager, setSticky, disableSticky, getSticky } = require('../utils/stickyManager');
+const { setSticky, disableSticky } = require('../utils/stickyManager');
 const { findChannel } = require('../utils/prefixParser');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('sticky')
-    .setDescription('Manage sticky messages in channels')
+    .setDescription('Manage stickied messages')
     .addSubcommand(sub =>
-      sub.setName('set')
-        .setDescription('Set or update the sticky message for a channel')
+      sub.setName('add')
+        .setDescription('Add or update a stickied message in a channel')
         .addStringOption(opt =>
           opt.setName('message')
-            .setDescription('Sticky message content')
+            .setDescription('Message content')
             .setRequired(true))
+        .addIntegerOption(opt =>
+          opt.setName('cooldown')
+            .setDescription('Cooldown in seconds (default 120)')
+            .setMinValue(0)
+            .setRequired(false))
+        .addBooleanOption(opt =>
+          opt.setName('warning')
+            .setDescription("Include '**__Stickied Message:__**' header (default on)")
+            .setRequired(false))
         .addChannelOption(opt =>
           opt.setName('channel')
-            .setDescription('Channel to set sticky (default: current)')
+            .setDescription('Target channel (default: current)')
             .setRequired(false)))
     .addSubcommand(sub =>
-      sub.setName('disable')
-        .setDescription('Disable sticky message in a channel')
+      sub.setName('remove')
+        .setDescription('Remove the stickied message from a channel')
         .addChannelOption(opt =>
           opt.setName('channel')
-            .setDescription('Channel to disable sticky (default: current)')
-            .setRequired(false)))
-    .addSubcommand(sub =>
-      sub.setName('show')
-        .setDescription('Show current sticky for a channel')
-        .addChannelOption(opt =>
-          opt.setName('channel')
-            .setDescription('Channel to show sticky (default: current)')
+            .setDescription('Target channel (default: current)')
             .setRequired(false))),
 
   async execute(interaction) {
-    if (!interaction.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) {
+    const perms = interaction.member.permissions;
+    const hasModPerms = perms.has(PermissionsBitField.Flags.ManageMessages)
+      || perms.has(PermissionsBitField.Flags.ManageGuild)
+      || perms.has(PermissionsBitField.Flags.BanMembers)
+      || perms.has(PermissionsBitField.Flags.KickMembers);
+
+    if (!hasModPerms) {
       return interaction.reply({
         content: '❌ You need moderator permissions (Manage Messages) to use this command.',
         flags: MessageFlags.Ephemeral
@@ -44,44 +52,43 @@ module.exports = {
     const channel = interaction.options.getChannel('channel') || interaction.channel;
     const guildId = interaction.guildId;
 
-    if (sub === 'set') {
+    if (sub === 'add') {
       const message = interaction.options.getString('message');
-      const ok = await setSticky(guildId, channel, message);
-      if (!ok) return interaction.reply('❌ Failed to set sticky message.');
-      return interaction.reply(`✅ Sticky message set in ${channel}`);
+      const cooldown = interaction.options.getInteger('cooldown') ?? 120;
+      const warning = interaction.options.getBoolean('warning');
+      const ok = await setSticky(guildId, channel, message, cooldown, warning == null ? true : warning);
+      if (!ok) return interaction.reply({ content: '❌ Failed to set stickied message.', flags: MessageFlags.Ephemeral });
+      return interaction.reply({ content: `✅ Stickied message set in ${channel} (cooldown ${cooldown}s)`, flags: MessageFlags.Ephemeral });
     }
 
-    if (sub === 'disable') {
+    if (sub === 'remove') {
       const ok = await disableSticky(guildId, channel);
-      if (!ok) return interaction.reply('❌ Failed to disable sticky message.');
-      return interaction.reply(`✅ Sticky message disabled in ${channel}`);
-    }
-
-    if (sub === 'show') {
-      const cfg = getSticky(channel.id);
-      if (!cfg) return interaction.reply(`ℹ️ No sticky message configured in ${channel}.`);
-      return interaction.reply({ content: `📌 Sticky in ${channel}:
-
-${cfg.content}`, flags: MessageFlags.Ephemeral });
+      if (!ok) return interaction.reply({ content: '❌ Failed to remove stickied message.', flags: MessageFlags.Ephemeral });
+      return interaction.reply({ content: `✅ Removed stickied message from ${channel}`, flags: MessageFlags.Ephemeral });
     }
   },
 
   async executePrefix(message, args, rawArgs) {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) {
+    const perms = message.member.permissions;
+    const hasModPerms = perms.has(PermissionsBitField.Flags.ManageMessages)
+      || perms.has(PermissionsBitField.Flags.ManageGuild)
+      || perms.has(PermissionsBitField.Flags.BanMembers)
+      || perms.has(PermissionsBitField.Flags.KickMembers);
+
+    if (!hasModPerms) {
       return message.reply('❌ You need moderator permissions (Manage Messages) to use this command.');
     }
 
     const sub = (args[0] || '').toLowerCase();
-    if (!['set', 'disable', 'show'].includes(sub)) {
-      return message.reply('❌ Usage: `!sticky set [#channel] | <message>` | `!sticky disable [#channel]` | `!sticky show [#channel]`');
+    if (!['add', 'remove', 'set', 'disable'].includes(sub)) {
+      return message.reply('❌ Usage: `!sticky add [#channel] | <message> [| cooldown=<seconds>] [| warning=true|false]` | `!sticky remove [#channel]`');
     }
 
     let channel = message.channel;
     let rest = rawArgs.slice(sub.length).trim();
 
-    // If a channel mention/name is present before a pipe for set, or as sole arg for disable/show
     const channelMention = rest.match(/^<#\d+>|^\S+/)?.[0];
-    if (channelMention && sub !== 'set') {
+    if (channelMention && !['set', 'add'].includes(sub)) {
       const found = findChannel(message.guild, channelMention);
       if (found) {
         channel = found;
@@ -89,34 +96,45 @@ ${cfg.content}`, flags: MessageFlags.Ephemeral });
       }
     }
 
-    if (sub === 'set') {
+    if (sub === 'set' || sub === 'add') {
       const pipeIdx = rest.indexOf('|');
       if (pipeIdx === -1) {
-        return message.reply('❌ Usage: `!sticky set [#channel] | <message>`');
+        return message.reply('❌ Usage: `!sticky add [#channel] | <message> [| cooldown=<seconds>] [| warning=true|false]`');
       }
 
       const maybeChan = rest.slice(0, pipeIdx).trim();
       const found = findChannel(message.guild, maybeChan);
       if (found) channel = found;
 
-      const stickyText = rest.slice(pipeIdx + 1).trim();
-      if (!stickyText) return message.reply('❌ Sticky message cannot be empty.');
+      const remainder = rest.slice(pipeIdx + 1).trim();
+      if (!remainder) return message.reply('❌ Sticky message cannot be empty.');
 
-      const ok = await setSticky(message.guild.id, channel, stickyText);
-      if (!ok) return message.reply('❌ Failed to set sticky message.');
-      return message.reply(`✅ Sticky message set in ${channel}`);
+      const parts = remainder.split('|').map(p => p.trim()).filter(Boolean);
+      const stickyText = parts[0];
+      let cooldown = 120;
+      let warning = true;
+      for (let i = 1; i < parts.length; i++) {
+        const [k, vRaw] = parts[i].split('=').map(s => s?.trim());
+        if (!k) continue;
+        const kL = k.toLowerCase();
+        if (kL === 'cooldown') {
+          const v = parseInt(vRaw, 10);
+          if (!isNaN(v) && v >= 0) cooldown = v;
+        } else if (kL === 'warning') {
+          const v = (vRaw || '').toLowerCase();
+          if (v === 'true' || v === 'false') warning = v === 'true';
+        }
+      }
+
+      const ok = await setSticky(message.guild.id, channel, stickyText, cooldown, warning);
+      if (!ok) return message.reply('❌ Failed to set stickied message.');
+      return message.reply(`✅ Stickied message set in ${channel} (cooldown ${cooldown}s)`);
     }
 
-    if (sub === 'disable') {
+    if (sub === 'disable' || sub === 'remove') {
       const ok = await disableSticky(message.guild.id, channel);
-      if (!ok) return message.reply('❌ Failed to disable sticky message.');
-      return message.reply(`✅ Sticky message disabled in ${channel}`);
-    }
-
-    if (sub === 'show') {
-      const cfg = getSticky(channel.id);
-      if (!cfg) return message.reply(`ℹ️ No sticky message configured in ${channel}.`);
-      return message.reply(`📌 Sticky in ${channel}:\n\n${cfg.content}`);
+      if (!ok) return message.reply('❌ Failed to remove stickied message.');
+      return message.reply(`✅ Removed stickied message from ${channel}`);
     }
   }
 };
