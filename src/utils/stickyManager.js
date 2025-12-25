@@ -1,14 +1,11 @@
-const { client } = require('./database');
+const { client, saveStickyMessage, deleteStickyMessage, loadStickyMessages } = require('./database');
 
 const stickies = {};
 
 async function initializeStickyManager() {
   try {
-    const result = await client.execute({
-      sql: 'SELECT guild_id, channel_id, content, last_message_id, cooldown_ms, include_warning FROM sticky_messages',
-      args: []
-    });
-    for (const row of result.rows) {
+    const rows = await loadStickyMessages();
+    for (const row of rows) {
       const cooldownMs = Number(row.cooldown_ms ?? 120000);
       const includeWarning = (row.include_warning == null) ? true : (Number(row.include_warning) !== 0);
       stickies[row.channel_id] = {
@@ -31,14 +28,10 @@ async function setSticky(guildId, channel, content, cooldownSeconds = 120, inclu
   try {
     const cooldownMs = Math.max(0, Math.floor(Number(cooldownSeconds) || 0) * 1000);
 
-    await client.execute({
-      sql: `INSERT OR REPLACE INTO sticky_messages (
-              guild_id, channel_id, content, last_message_id, cooldown_ms, include_warning
-            ) VALUES (
-              ?, ?, ?, COALESCE((SELECT last_message_id FROM sticky_messages WHERE guild_id = ? AND channel_id = ?), NULL), ?, ?
-            )`,
-      args: [guildId, channelId, content, guildId, channelId, cooldownMs, includeWarning ? 1 : 0]
-    });
+    const saved = await saveStickyMessage(guildId, channelId, content, cooldownMs, includeWarning);
+    if (!saved) {
+      return { ok: false, error: 'DB_WRITE_FAILED: see server logs' };
+    }
 
     stickies[channelId] = {
       guildId,
@@ -59,10 +52,10 @@ async function setSticky(guildId, channel, content, cooldownSeconds = 120, inclu
 async function disableSticky(guildId, channel) {
   const channelId = channel.id;
   try {
-    await client.execute({
-      sql: 'DELETE FROM sticky_messages WHERE guild_id = ? AND channel_id = ?',
-      args: [guildId, channelId]
-    });
+    const deleted = await deleteStickyMessage(guildId, channelId);
+    if (!deleted) {
+      console.error('Error deleting sticky (DB)');
+    }
 
     const lastId = stickies[channelId]?.lastMessageId;
     if (lastId) {

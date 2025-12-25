@@ -21,7 +21,7 @@ async function initializeDatabase() {
         trigger_phrase TEXT NOT NULL,
         response TEXT NOT NULL,
         channel_id TEXT,
-        UNIQUE(guild_id, trigger_phrase, channel_id)
+  loadStickyMessages,
       )`,
       args: []
     });
@@ -110,7 +110,50 @@ async function initializeDatabase() {
   }
 }
 
+async function saveStickyMessage(guildId, channelId, content, cooldownMs, includeWarning) {
+  try {
+    await client.execute({
+      sql: `INSERT OR REPLACE INTO sticky_messages (
+              guild_id, channel_id, content, last_message_id, cooldown_ms, include_warning
+            ) VALUES (
+              ?, ?, ?, COALESCE((SELECT last_message_id FROM sticky_messages WHERE guild_id = ? AND channel_id = ?), NULL), ?, ?
+            )`,
+      args: [guildId, channelId, content, guildId, channelId, cooldownMs, includeWarning ? 1 : 0]
+    });
+    return true;
+  } catch (err) {
+    console.error('Error saving sticky message:', err && err.message ? err.message : err);
+    return false;
+  }
+}
+
+async function deleteStickyMessage(guildId, channelId) {
+  try {
+    await client.execute({
+      sql: 'DELETE FROM sticky_messages WHERE guild_id = ? AND channel_id = ?',
+      args: [guildId, channelId]
+    });
+    return true;
+  } catch (err) {
+    console.error('Error deleting sticky message:', err && err.message ? err.message : err);
+    return false;
+  }
+}
+
 async function loadAutoresponders() {
+
+  async function loadStickyMessages() {
+    try {
+      const result = await client.execute({
+        sql: 'SELECT guild_id, channel_id, content, last_message_id, cooldown_ms, include_warning FROM sticky_messages',
+        args: []
+      });
+      return result.rows;
+    } catch (err) {
+      console.error('Error loading sticky messages:', err.message || err);
+      return [];
+    }
+  }
   try {
     const result = await client.execute({
       sql: 'SELECT * FROM autoresponders',
@@ -342,5 +385,8 @@ module.exports = {
   getReviewById,
   deleteReview,
   getPluginAverageRating,
-  getTopReviewedPlugins
+  getTopReviewedPlugins,
+  saveStickyMessage,
+  deleteStickyMessage,
+  loadStickyMessages
 };
