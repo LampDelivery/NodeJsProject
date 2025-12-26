@@ -36,7 +36,7 @@ module.exports = {
 
   async execute(interaction) {
     try {
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
       const perms = interaction.member.permissions;
       const hasModPerms = perms.has(PermissionsBitField.Flags.ManageMessages)
